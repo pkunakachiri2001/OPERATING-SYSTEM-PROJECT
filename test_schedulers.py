@@ -5,7 +5,7 @@ import os
 sys.path.insert(0, os.path.abspath(os.path.dirname(__file__)))
 
 from process_module import get_sample_processes, clone_process_list
-from scheduling import run_fcfs, RRScheduler, AdaptiveRRScheduler, print_gantt_chart, print_metrics
+from scheduling import run_fcfs, RRScheduler, AdaptiveRRScheduler, run_sjf, run_priority, print_gantt_chart, print_metrics
 
 def main():
     print("=== Testing Scheduling Algorithms ===")
@@ -44,6 +44,26 @@ def main():
     gantt_arr = scheduler_arr.run()
     print_gantt_chart(gantt_arr)
     print_metrics(arr_processes)
+
+    # 5. Test Shortest Job First
+    print("\n\n--- 5. Testing Shortest Job First (SJF) ---")
+    sjf_processes = clone_process_list(base_workload)
+    gantt_sjf = run_sjf(sjf_processes)
+    print_gantt_chart(gantt_sjf)
+    print_metrics(sjf_processes)
+
+    # 6. Test Priority Scheduling
+    print("\n\n--- 6. Testing Priority Scheduling ---")
+    # Set priorities explicitly
+    prio_processes = clone_process_list(base_workload)
+    prio_processes[0].priority = 4
+    prio_processes[1].priority = 1
+    prio_processes[2].priority = 2
+    prio_processes[3].priority = 3
+    
+    gantt_prio = run_priority(prio_processes)
+    print_gantt_chart(gantt_prio)
+    print_metrics(prio_processes)
 
 if __name__ == "__main__":
     main()
