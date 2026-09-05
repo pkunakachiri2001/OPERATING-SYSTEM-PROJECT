@@ -247,37 +247,41 @@ function App() {
       { id: 'rr', name: 'RR' },
     ]
     
-    // Find absolute minimums for intelligent highlighting
+    // Sort algorithms dynamically based on average waiting time (lowest is best)
+    algos.sort((a, b) => results[a.id].metrics.avg_waiting_time - results[b.id].metrics.avg_waiting_time)
+
     const minWait = Math.min(...algos.map(a => results[a.id].metrics.avg_waiting_time))
     const minTurn = Math.min(...algos.map(a => results[a.id].metrics.avg_turnaround_time))
     const minResp = Math.min(...algos.map(a => results[a.id].metrics.avg_response_time))
     const minCtx = Math.min(...algos.map(a => results[a.id].metrics.total_context_switches))
 
     return (
-      <div className="mt-4 p-3 border border-cyan-900 bg-cyan-900/10">
-        <h3 className="text-[10px] text-yellow-500 uppercase tracking-widest flex items-center gap-2 mb-3">
-          <Table size={12} /> METRICS_MATRIX
+      <div className="mt-4 p-4 border border-cyan-900 bg-cyan-900/10 shadow-[0_0_15px_rgba(0,240,255,0.05)]">
+        <h3 className="text-xs text-yellow-500 uppercase tracking-widest flex items-center gap-2 mb-4">
+          <Table size={14} /> METRICS_MATRIX [SORTED]
         </h3>
-        <table className="w-full text-left text-[9px] text-cyan-300">
+        <table className="w-full text-left text-[10px] text-cyan-300">
           <thead>
             <tr className="text-cyan-700 border-b border-cyan-900/50">
-              <th className="py-1">ALGO</th>
-              <th className="py-1">WAIT</th>
-              <th className="py-1">TURN</th>
-              <th className="py-1">RESP</th>
-              <th className="py-1">CTX</th>
+              <th className="py-2">RNK</th>
+              <th className="py-2">ALGO</th>
+              <th className="py-2">WAIT</th>
+              <th className="py-2">TURN</th>
+              <th className="py-2">RESP</th>
+              <th className="py-2">CTX</th>
             </tr>
           </thead>
           <tbody>
-            {algos.map(a => {
+            {algos.map((a, index) => {
               const m = results[a.id].metrics
               return (
-                <tr key={a.id} className="border-b border-cyan-900/20 hover:bg-cyan-900/30 transition">
-                  <td className="py-1.5 font-bold">{a.name}</td>
-                  <td className={`py-1.5 ${m.avg_waiting_time === minWait ? 'text-green-400 font-bold' : ''}`}>{m.avg_waiting_time.toFixed(1)}</td>
-                  <td className={`py-1.5 ${m.avg_turnaround_time === minTurn ? 'text-green-400 font-bold' : ''}`}>{m.avg_turnaround_time.toFixed(1)}</td>
-                  <td className={`py-1.5 ${m.avg_response_time === minResp ? 'text-green-400 font-bold' : ''}`}>{m.avg_response_time.toFixed(1)}</td>
-                  <td className={`py-1.5 ${m.total_context_switches === minCtx ? 'text-green-400 font-bold' : ''}`}>{m.total_context_switches}</td>
+                <tr key={a.id} className="border-b border-cyan-900/20 hover:bg-cyan-900/30 transition group">
+                  <td className="py-2 font-mono text-cyan-700 group-hover:text-cyan-400">#{index + 1}</td>
+                  <td className="py-2 font-bold uppercase tracking-widest">{a.name}</td>
+                  <td className={`py-2 ${m.avg_waiting_time === minWait ? 'text-green-400 font-bold shadow-green' : ''}`}>{m.avg_waiting_time.toFixed(1)}</td>
+                  <td className={`py-2 ${m.avg_turnaround_time === minTurn ? 'text-green-400 font-bold' : ''}`}>{m.avg_turnaround_time.toFixed(1)}</td>
+                  <td className={`py-2 ${m.avg_response_time === minResp ? 'text-green-400 font-bold' : ''}`}>{m.avg_response_time.toFixed(1)}</td>
+                  <td className={`py-2 ${m.total_context_switches === minCtx ? 'text-green-400 font-bold' : ''}`}>{m.total_context_switches}</td>
                 </tr>
               )
             })}
