@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
-import { Settings, Play, Server, Crosshair, Download, Trash2, Info, Terminal, ShieldAlert, Activity } from 'lucide-react'
-import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Tooltip, ResponsiveContainer, Legend } from 'recharts'
+import { useState, useEffect, useRef } from 'react'
+import { Settings, Play, Server, Crosshair, Download, Trash2, Info, Terminal, ShieldAlert, Activity, Copy, BarChart3, Shuffle } from 'lucide-react'
+import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { motion, AnimatePresence } from 'framer-motion'
 
 const InfoTooltip = ({ text }) => (
@@ -55,6 +55,8 @@ function App() {
   const [results, setResults] = useState(null)
   const [simulating, setSimulating] = useState(false)
   const [scanProgress, setScanProgress] = useState(0)
+  const [chartType, setChartType] = useState('radar')
+  const [playingGantt, setPlayingGantt] = useState(null)
 
   const loadPreset = async (type) => {
     let newProcs = []
@@ -78,6 +80,11 @@ function App() {
           { pid: 'P3', arrival_time: 2, burst_time: 1, priority: 4 },
           { pid: 'P4', arrival_time: 3, burst_time: 3, priority: 2 },
         ]
+        break
+      case 'stress':
+        newProcs = Array.from({length: 8}, (_, i) => ({
+          pid: `P${i+1}`, arrival_time: Math.floor(i/2), burst_time: 1 + (i % 2), priority: Math.floor(Math.random() * 5) + 1
+        }))
         break
     }
     setProcesses(newProcs)
@@ -134,6 +141,10 @@ function App() {
     setProcesses(processes.filter((_, i) => i !== index))
   }
 
+  const randomizePriorities = () => {
+    setProcesses(processes.map(p => ({...p, priority: Math.floor(Math.random() * 5) + 1})))
+  }
+
   const exportToCSV = () => {
     if (!results) return
     let csvContent = "data:text/csv;charset=utf-8,"
@@ -150,14 +161,35 @@ function App() {
     document.body.removeChild(link)
   }
 
-  const renderLaserTimeline = (gantt) => {
+  const copyMetrics = () => {
+    if (!results) return
+    let text = "ALGORITHM\tWAIT\tTURN\tRESP\tCTX_SW\n"
+    text += `FCFS\t${results.fcfs.metrics.avg_waiting_time}\t${results.fcfs.metrics.avg_turnaround_time}\t${results.fcfs.metrics.avg_response_time}\t${results.fcfs.metrics.total_context_switches}\n`
+    text += `SJF\t${results.sjf.metrics.avg_waiting_time}\t${results.sjf.metrics.avg_turnaround_time}\t${results.sjf.metrics.avg_response_time}\t${results.sjf.metrics.total_context_switches}\n`
+    text += `PRIO\t${results.priority.metrics.avg_waiting_time}\t${results.priority.metrics.avg_turnaround_time}\t${results.priority.metrics.avg_response_time}\t${results.priority.metrics.total_context_switches}\n`
+    text += `RR\t${results.rr.metrics.avg_waiting_time}\t${results.rr.metrics.avg_turnaround_time}\t${results.rr.metrics.avg_response_time}\t${results.rr.metrics.total_context_switches}\n`
+    text += `ARR\t${results.adaptive_rr.metrics.avg_waiting_time}\t${results.adaptive_rr.metrics.avg_turnaround_time}\t${results.adaptive_rr.metrics.avg_response_time}\t${results.adaptive_rr.metrics.total_context_switches}\n`
+    navigator.clipboard.writeText(text)
+    alert("Metrics copied to clipboard!")
+  }
+
+  const renderLaserTimeline = (algoName, gantt) => {
     const totalTime = gantt[gantt.length - 1]?.end || 1
     const pids = [...new Set(gantt.map(g => g.pid))].sort()
+    const isPlaying = playingGantt === algoName
     
     return (
       <div className="mt-6 border-t border-cyan-900/50 pt-4">
-        <div className="text-[10px] text-cyan-500 mb-3 uppercase tracking-widest flex items-center gap-2">
-          <Crosshair size={12} /> TIMELINE.EXEC
+        <div className="flex justify-between items-center mb-3">
+          <div className="text-[10px] text-cyan-500 uppercase tracking-widest flex items-center gap-2">
+            <Crosshair size={12} /> TIMELINE.EXEC
+          </div>
+          <button 
+            onClick={() => setPlayingGantt(isPlaying ? null : algoName)}
+            className="text-[9px] uppercase tracking-widest text-cyan-600 hover:text-cyan-300 transition flex items-center gap-1 border border-cyan-900 px-2 py-0.5"
+          >
+            <Play size={8} /> {isPlaying ? 'STOP' : 'REPLAY_EXEC'}
+          </button>
         </div>
         
         <div className="relative h-8 border-b border-l border-cyan-900/50 flex overflow-hidden">
@@ -172,10 +204,10 @@ function App() {
             
             return (
               <motion.div
-                initial={{ width: 0 }}
+                initial={isPlaying ? { width: 0 } : false}
                 animate={{ width: `${widthPct}%` }}
-                transition={{ duration: 0.1, delay: i * 0.1, ease: "linear" }}
-                key={i}
+                transition={{ duration: 0.1, delay: isPlaying ? i * 0.1 : 0, ease: "linear" }}
+                key={isPlaying ? `${algoName}-play-${i}` : `${algoName}-${i}`}
                 className={`h-full flex items-center justify-center text-[9px] font-bold text-black border-r border-black relative group ${colorClass} ${shadowClass} opacity-80 hover:opacity-100 transition-opacity`}
               >
                 {widthPct > 4 && block.pid}
@@ -217,6 +249,7 @@ function App() {
             <button onClick={() => loadPreset('cpu')} className="text-[10px] uppercase tracking-widest text-cyan-600 hover:text-cyan-100 hover:shadow-[0_0_8px_rgba(0,240,255,0.5)] transition px-2 py-1 border border-cyan-900 hover:border-cyan-400">[ CPU_HEAVY ]</button>
             <button onClick={() => loadPreset('io')} className="text-[10px] uppercase tracking-widest text-cyan-600 hover:text-cyan-100 hover:shadow-[0_0_8px_rgba(0,240,255,0.5)] transition px-2 py-1 border border-cyan-900 hover:border-cyan-400">[ IO_BOUND ]</button>
             <button onClick={() => loadPreset('spike')} className="text-[10px] uppercase tracking-widest text-magenta-600 hover:text-magenta-100 hover:shadow-[0_0_8px_rgba(255,0,85,0.5)] transition px-2 py-1 border border-magenta-900 hover:border-magenta-400">[ SPIKE_ANOMALY ]</button>
+            <button onClick={() => loadPreset('stress')} className="text-[10px] uppercase tracking-widest text-yellow-600 hover:text-yellow-100 hover:shadow-[0_0_8px_rgba(234,179,8,0.5)] transition px-2 py-1 border border-yellow-900 hover:border-yellow-400">[ STRESS_TEST ]</button>
           </div>
         </header>
 
@@ -274,8 +307,9 @@ function App() {
                 <h2 className="text-[10px] text-cyan-500 uppercase tracking-widest flex items-center gap-2">
                   <Server size={12} /> THREAD_QUEUE
                 </h2>
-                <div className="flex gap-3">
-                  <button onClick={() => setProcesses([])} className="text-[9px] uppercase tracking-widest text-magenta-500 hover:text-magenta-300 transition">PURGE</button>
+                <div className="flex gap-2">
+                  <button onClick={randomizePriorities} className="text-[9px] uppercase tracking-widest text-yellow-500 hover:text-yellow-300 transition flex items-center gap-1" title="Randomize Priorities"><Shuffle size={10} /> PRIO</button>
+                  <button onClick={() => setProcesses([])} className="text-[9px] uppercase tracking-widest text-magenta-500 hover:text-magenta-300 transition ml-2">PURGE</button>
                   <button onClick={addProcess} className="text-[9px] uppercase tracking-widest text-cyan-400 hover:text-cyan-200 transition">INJECT</button>
                 </div>
               </div>
@@ -350,30 +384,56 @@ function App() {
                     <h2 className="text-[10px] text-cyan-500 uppercase tracking-widest flex items-center gap-2">
                       <Crosshair size={12} /> ALGORITHM_MATRIX
                     </h2>
-                    <button onClick={exportToCSV} className="text-[9px] uppercase tracking-widest text-magenta-400 hover:text-magenta-200 transition border border-magenta-900 px-2 py-1 flex items-center gap-1">
-                      <Download size={10} /> DUMP_DATA
-                    </button>
+                    <div className="flex gap-2">
+                      <button onClick={() => setChartType(c => c === 'radar' ? 'bar' : 'radar')} className="text-[9px] uppercase tracking-widest text-cyan-400 hover:text-cyan-200 transition border border-cyan-900 px-2 py-1 flex items-center gap-1">
+                        <BarChart3 size={10} /> TOGGLE_VIEW
+                      </button>
+                      <button onClick={copyMetrics} className="text-[9px] uppercase tracking-widest text-cyan-400 hover:text-cyan-200 transition border border-cyan-900 px-2 py-1 flex items-center gap-1">
+                        <Copy size={10} /> COPY
+                      </button>
+                      <button onClick={exportToCSV} className="text-[9px] uppercase tracking-widest text-magenta-400 hover:text-magenta-200 transition border border-magenta-900 px-2 py-1 flex items-center gap-1">
+                        <Download size={10} /> DUMP_DATA
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="flex-1 w-full text-[10px]">
                     <ResponsiveContainer width="100%" height="100%">
-                      <RadarChart cx="50%" cy="50%" outerRadius="70%" data={[
-                        { subject: 'WAIT', FCFS: results.fcfs.metrics.avg_waiting_time, RR: results.rr.metrics.avg_waiting_time, ARR: results.adaptive_rr.metrics.avg_waiting_time, SJF: results.sjf.metrics.avg_waiting_time, PRIO: results.priority.metrics.avg_waiting_time },
-                        { subject: 'TURN', FCFS: results.fcfs.metrics.avg_turnaround_time, RR: results.rr.metrics.avg_turnaround_time, ARR: results.adaptive_rr.metrics.avg_turnaround_time, SJF: results.sjf.metrics.avg_turnaround_time, PRIO: results.priority.metrics.avg_turnaround_time },
-                        { subject: 'RESP', FCFS: results.fcfs.metrics.avg_response_time, RR: results.rr.metrics.avg_response_time, ARR: results.adaptive_rr.metrics.avg_response_time, SJF: results.sjf.metrics.avg_response_time, PRIO: results.priority.metrics.avg_response_time },
-                        { subject: 'CTX_SW', FCFS: results.fcfs.metrics.total_context_switches, RR: results.rr.metrics.total_context_switches, ARR: results.adaptive_rr.metrics.total_context_switches, SJF: results.sjf.metrics.total_context_switches, PRIO: results.priority.metrics.total_context_switches }
-                      ]}>
-                        <PolarGrid stroke="#00F0FF" strokeOpacity={0.1} />
-                        <PolarAngleAxis dataKey="subject" tick={{ fill: '#00F0FF', fontSize: 10, letterSpacing: '2px' }} />
-                        <PolarRadiusAxis tick={false} axisLine={false} />
-                        <Radar name="FCFS" dataKey="FCFS" stroke="#3f3f46" fill="#3f3f46" fillOpacity={0.1} />
-                        <Radar name="SJF" dataKey="SJF" stroke="#eab308" fill="#eab308" fillOpacity={0.1} />
-                        <Radar name="PRIORITY" dataKey="PRIO" stroke="#a855f7" fill="#a855f7" fillOpacity={0.1} />
-                        <Radar name={`RR[${rrQuantum}]`} dataKey="RR" stroke="#00d6e6" fill="#00d6e6" fillOpacity={0.1} />
-                        <Radar name="ARR_OPTI" dataKey="ARR" stroke="#FF0055" fill="#FF0055" fillOpacity={0.3} />
-                        <Legend wrapperStyle={{ fontSize: '10px' }} />
-                        <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #00F0FF', color: '#00F0FF' }} itemStyle={{ color: '#00F0FF' }} />
-                      </RadarChart>
+                      {chartType === 'radar' ? (
+                        <RadarChart cx="50%" cy="50%" outerRadius="70%" data={[
+                          { subject: 'WAIT', FCFS: results.fcfs.metrics.avg_waiting_time, RR: results.rr.metrics.avg_waiting_time, ARR: results.adaptive_rr.metrics.avg_waiting_time, SJF: results.sjf.metrics.avg_waiting_time, PRIO: results.priority.metrics.avg_waiting_time },
+                          { subject: 'TURN', FCFS: results.fcfs.metrics.avg_turnaround_time, RR: results.rr.metrics.avg_turnaround_time, ARR: results.adaptive_rr.metrics.avg_turnaround_time, SJF: results.sjf.metrics.avg_turnaround_time, PRIO: results.priority.metrics.avg_turnaround_time },
+                          { subject: 'RESP', FCFS: results.fcfs.metrics.avg_response_time, RR: results.rr.metrics.avg_response_time, ARR: results.adaptive_rr.metrics.avg_response_time, SJF: results.sjf.metrics.avg_response_time, PRIO: results.priority.metrics.avg_response_time },
+                          { subject: 'CTX_SW', FCFS: results.fcfs.metrics.total_context_switches, RR: results.rr.metrics.total_context_switches, ARR: results.adaptive_rr.metrics.total_context_switches, SJF: results.sjf.metrics.total_context_switches, PRIO: results.priority.metrics.total_context_switches }
+                        ]}>
+                          <PolarGrid stroke="#00F0FF" strokeOpacity={0.1} />
+                          <PolarAngleAxis dataKey="subject" tick={{ fill: '#00F0FF', fontSize: 10, letterSpacing: '2px' }} />
+                          <PolarRadiusAxis tick={false} axisLine={false} />
+                          <Radar name="FCFS" dataKey="FCFS" stroke="#3f3f46" fill="#3f3f46" fillOpacity={0.1} />
+                          <Radar name="SJF" dataKey="SJF" stroke="#eab308" fill="#eab308" fillOpacity={0.1} />
+                          <Radar name="PRIORITY" dataKey="PRIO" stroke="#a855f7" fill="#a855f7" fillOpacity={0.1} />
+                          <Radar name={`RR[${rrQuantum}]`} dataKey="RR" stroke="#00d6e6" fill="#00d6e6" fillOpacity={0.1} />
+                          <Radar name="ARR_OPTI" dataKey="ARR" stroke="#FF0055" fill="#FF0055" fillOpacity={0.3} />
+                          <Legend wrapperStyle={{ fontSize: '10px' }} />
+                          <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #00F0FF', color: '#00F0FF' }} itemStyle={{ color: '#00F0FF' }} />
+                        </RadarChart>
+                      ) : (
+                        <BarChart data={[
+                          { name: 'FCFS', wait: results.fcfs.metrics.avg_waiting_time, turn: results.fcfs.metrics.avg_turnaround_time },
+                          { name: 'SJF', wait: results.sjf.metrics.avg_waiting_time, turn: results.sjf.metrics.avg_turnaround_time },
+                          { name: 'PRIO', wait: results.priority.metrics.avg_waiting_time, turn: results.priority.metrics.avg_turnaround_time },
+                          { name: 'RR', wait: results.rr.metrics.avg_waiting_time, turn: results.rr.metrics.avg_turnaround_time },
+                          { name: 'ARR', wait: results.adaptive_rr.metrics.avg_waiting_time, turn: results.adaptive_rr.metrics.avg_turnaround_time },
+                        ]}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="#00F0FF" strokeOpacity={0.1} />
+                          <XAxis dataKey="name" stroke="#00F0FF" fontSize={10} />
+                          <YAxis stroke="#00F0FF" fontSize={10} />
+                          <Tooltip contentStyle={{ backgroundColor: '#000', border: '1px solid #00F0FF' }} />
+                          <Legend />
+                          <Bar dataKey="wait" name="Wait Time" fill="#00F0FF" />
+                          <Bar dataKey="turn" name="Turnaround" fill="#FF0055" />
+                        </BarChart>
+                      )}
                     </ResponsiveContainer>
                   </div>
                 </div>
@@ -404,7 +464,7 @@ function App() {
                         ))}
                       </div>
 
-                      {renderLaserTimeline(algo.data.gantt)}
+                      {renderLaserTimeline(algo.title, algo.data.gantt)}
                     </div>
                   ))}
                 </div>
