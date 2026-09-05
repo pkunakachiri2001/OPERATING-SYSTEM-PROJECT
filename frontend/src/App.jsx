@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Server, Crosshair, Download, Trash2, Info, Terminal, ShieldAlert, Activity, Copy, BarChart3, Shuffle } from 'lucide-react'
+import { Settings, Play, Server, Crosshair, Download, Trash2, Info, Terminal, ShieldAlert, Activity, Copy, BarChart3, Shuffle, Trophy, Cpu, Zap } from 'lucide-react'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -57,6 +57,11 @@ function App() {
   const [scanProgress, setScanProgress] = useState(0)
   const [chartType, setChartType] = useState('radar')
   const [playingGantt, setPlayingGantt] = useState(null)
+  const [logs, setLogs] = useState([])
+
+  const addLog = (msg) => {
+    setLogs(prev => [...prev, { time: new Date().toISOString().split('T')[1].slice(0, 12), msg }].slice(-6))
+  }
 
   const loadPreset = async (type) => {
     let newProcs = []
@@ -95,17 +100,17 @@ function App() {
     if (procs.length === 0) return
     setSimulating(true)
     setScanProgress(0)
+    setLogs([])
+    addLog(`> INJECTING ${procs.length} PROCESSES INTO MATRIX`)
     
-    // Fake "Decoding" animation
-    const interval = setInterval(() => {
+    const scanInterval = setInterval(() => {
       setScanProgress(p => {
-        if (p >= 100) {
-          clearInterval(interval)
-          return 100
-        }
-        return p + 10
+        if (p < 30) addLog(`> CALCULATING EWMA COEFFICIENTS...`)
+        else if (p < 60) addLog(`> OPTIMIZING QUANTUMS...`)
+        else if (p < 90) addLog(`> DISPATCHING THREADS...`)
+        return Math.min(p + 15, 100)
       })
-    }, 100)
+    }, 150)
 
     try {
       const res = await fetch('http://localhost:8000/simulate', {
@@ -115,10 +120,14 @@ function App() {
       })
       const data = await res.json()
       setTimeout(() => {
+        clearInterval(scanInterval)
+        addLog(`> EXECUTION COMPLETE. MATRIX RENDERED.`)
         setResults(data)
         setSimulating(false)
-      }, 1500) // Delay to show cool animation
+      }, 1500)
     } catch (e) {
+      clearInterval(scanInterval)
+      addLog(`> [ERROR] CONNECTION TO KERNEL LOST.`)
       alert("Error connecting to backend API.")
       setSimulating(false)
     }
@@ -227,6 +236,25 @@ function App() {
       </div>
     )
   }
+
+  const renderWinner = () => results && (
+    <div className="mt-4 p-3 border border-emerald-900 bg-emerald-900/10 text-[10px] uppercase text-emerald-500 flex items-center gap-2">
+      <Trophy size={14} /> BEST_PERFORMER: {Object.entries(results).filter(x => x[0] !== 'rr').reduce((a, b) => a[1].metrics.avg_waiting_time < b[1].metrics.avg_waiting_time ? a : b)[0].toUpperCase()}
+    </div>
+  )
+
+  const renderTelemetry = () => (
+    <div className="mt-2 grid grid-cols-2 gap-2 text-[9px] uppercase tracking-widest">
+      <div className="border border-cyan-900/50 p-2 text-cyan-700">CPU: <span className="text-cyan-400">IDLE</span></div>
+      <div className="border border-cyan-900/50 p-2 text-cyan-700">MEM: <span className="text-cyan-400">42%</span></div>
+    </div>
+  )
+
+  const renderTerminal = () => (
+    <div className="mt-2 p-2 bg-black border border-cyan-900/50 h-24 overflow-hidden text-[9px] font-mono text-cyan-600">
+      {logs.map((l, i) => <div key={i}>{l.time} {l.msg}</div>)}
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-black text-cyan-400 font-mono p-4 selection:bg-magenta-500/30 overflow-hidden relative">
@@ -350,12 +378,17 @@ function App() {
               </div>
 
               <button 
-                onClick={() => executeSimulation()}
+                onClick={() => executeSimulation(processes)}
                 disabled={simulating || processes.length === 0}
-                className="w-full mt-4 bg-cyan-900/20 hover:bg-cyan-900/40 border border-cyan-500 text-cyan-400 text-xs uppercase tracking-widest py-2 transition disabled:opacity-30 disabled:border-cyan-900"
+                className="w-full bg-cyan-950/30 hover:bg-cyan-900/50 border border-cyan-900 hover:border-cyan-400 text-cyan-300 hover:text-cyan-100 transition py-4 text-xs font-bold tracking-[0.2em] uppercase disabled:opacity-30 disabled:cursor-not-allowed group relative overflow-hidden"
               >
-                {simulating ? `COMPUTING [${scanProgress}%]` : 'EXECUTE_SIM'}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-cyan-500/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000" />
+                {simulating ? `COMPUTING [${scanProgress}%]` : '[ INITIALIZE_SIMULATION ]'}
               </button>
+              
+              {renderWinner()}
+              {renderTelemetry()}
+              {renderTerminal()}
             </div>
           </div>
 
