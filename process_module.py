@@ -10,7 +10,7 @@ from collections import deque
 class Process:
     """Represents a single process in the scheduling simulation."""
 
-    def __init__(self, pid, arrival_time, burst_time):
+    def __init__(self, pid, arrival_time, burst_time, priority=1):
         if arrival_time < 0 or burst_time <= 0:
             raise ValueError(f"Invalid process data for {pid}: "
                               f"arrival_time must be >= 0, burst_time must be > 0")
@@ -19,6 +19,7 @@ class Process:
         self.arrival_time = arrival_time
         self.burst_time = burst_time          # original CPU burst time (never modify this)
         self.remaining_time = burst_time      # used/decremented during RR / Adaptive RR
+        self.priority = priority              # Used for Priority Scheduling
 
         # Metrics filled in by whichever algorithm runs this process
         self.completion_time = 0
@@ -76,6 +77,7 @@ class Process:
             "pid": self.pid,
             "arrival_time": self.arrival_time,
             "burst_time": self.burst_time,
+            "priority": self.priority,
             "completion_time": self.completion_time,
             "waiting_time": self.waiting_time,
             "turnaround_time": self.turnaround_time,
@@ -120,7 +122,8 @@ def get_manual_input():
             try:
                 arrival_time = int(input(f"Enter arrival time for {pid}: "))
                 burst_time = int(input(f"Enter burst time for {pid}: "))
-                processes.append(Process(pid, arrival_time, burst_time))
+                priority = int(input(f"Enter priority for {pid} (lower is better): "))
+                processes.append(Process(pid, arrival_time, burst_time, priority))
                 break
             except ValueError as e:
                 print(f"Invalid input ({e}). Please re-enter values for {pid}.")
@@ -179,7 +182,7 @@ def clone_process_list(processes):
     algorithms without one run's state affecting another
     (e.g. Person 4 running FCFS, RR, and Adaptive RR back-to-back for comparison).
     """
-    return [Process(p.pid, p.arrival_time, p.burst_time) for p in processes]
+    return [Process(p.pid, p.arrival_time, p.burst_time, p.priority) for p in processes]
 
 
 # ---------------------------------------------------------------------------
