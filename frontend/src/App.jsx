@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Settings, Play, Server, Crosshair, Download, Trash2, Info, Terminal, ShieldAlert, Activity, Copy, BarChart3, Shuffle, Trophy, Cpu, Zap } from 'lucide-react'
+import { Settings, Play, Server, Crosshair, Download, Trash2, Info, Terminal, ShieldAlert, Activity, Copy, BarChart3, Shuffle, Trophy, Cpu, Zap, Table } from 'lucide-react'
 import { Radar, RadarChart, PolarGrid, PolarAngleAxis, PolarRadiusAxis, Tooltip, ResponsiveContainer, Legend, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts'
 import { motion, AnimatePresence } from 'framer-motion'
 
@@ -237,18 +237,55 @@ function App() {
     )
   }
 
-  const renderWinner = () => results && (
-    <div className="mt-4 p-3 border border-emerald-900 bg-emerald-900/10 text-[10px] uppercase text-emerald-500 flex items-center gap-2">
-      <Trophy size={14} /> BEST_PERFORMER: {Object.entries(results).filter(x => x[0] !== 'rr').reduce((a, b) => a[1].metrics.avg_waiting_time < b[1].metrics.avg_waiting_time ? a : b)[0].toUpperCase()}
-    </div>
-  )
+  const renderMetricsTable = () => {
+    if (!results) return null
+    const algos = [
+      { id: 'sjf', name: 'SJF' },
+      { id: 'adaptive_rr', name: 'ARR' },
+      { id: 'fcfs', name: 'FCFS' },
+      { id: 'priority', name: 'PRIO' },
+      { id: 'rr', name: 'RR' },
+    ]
+    
+    // Find absolute minimums for intelligent highlighting
+    const minWait = Math.min(...algos.map(a => results[a.id].metrics.avg_waiting_time))
+    const minTurn = Math.min(...algos.map(a => results[a.id].metrics.avg_turnaround_time))
+    const minResp = Math.min(...algos.map(a => results[a.id].metrics.avg_response_time))
+    const minCtx = Math.min(...algos.map(a => results[a.id].metrics.total_context_switches))
 
-  const renderTelemetry = () => (
-    <div className="mt-2 grid grid-cols-2 gap-2 text-[9px] uppercase tracking-widest">
-      <div className="border border-cyan-900/50 p-2 text-cyan-700">CPU: <span className="text-cyan-400">IDLE</span></div>
-      <div className="border border-cyan-900/50 p-2 text-cyan-700">MEM: <span className="text-cyan-400">42%</span></div>
-    </div>
-  )
+    return (
+      <div className="mt-4 p-3 border border-cyan-900 bg-cyan-900/10">
+        <h3 className="text-[10px] text-yellow-500 uppercase tracking-widest flex items-center gap-2 mb-3">
+          <Table size={12} /> METRICS_MATRIX
+        </h3>
+        <table className="w-full text-left text-[9px] text-cyan-300">
+          <thead>
+            <tr className="text-cyan-700 border-b border-cyan-900/50">
+              <th className="py-1">ALGO</th>
+              <th className="py-1">WAIT</th>
+              <th className="py-1">TURN</th>
+              <th className="py-1">RESP</th>
+              <th className="py-1">CTX</th>
+            </tr>
+          </thead>
+          <tbody>
+            {algos.map(a => {
+              const m = results[a.id].metrics
+              return (
+                <tr key={a.id} className="border-b border-cyan-900/20 hover:bg-cyan-900/30 transition">
+                  <td className="py-1.5 font-bold">{a.name}</td>
+                  <td className={`py-1.5 ${m.avg_waiting_time === minWait ? 'text-green-400 font-bold' : ''}`}>{m.avg_waiting_time.toFixed(1)}</td>
+                  <td className={`py-1.5 ${m.avg_turnaround_time === minTurn ? 'text-green-400 font-bold' : ''}`}>{m.avg_turnaround_time.toFixed(1)}</td>
+                  <td className={`py-1.5 ${m.avg_response_time === minResp ? 'text-green-400 font-bold' : ''}`}>{m.avg_response_time.toFixed(1)}</td>
+                  <td className={`py-1.5 ${m.total_context_switches === minCtx ? 'text-green-400 font-bold' : ''}`}>{m.total_context_switches}</td>
+                </tr>
+              )
+            })}
+          </tbody>
+        </table>
+      </div>
+    )
+  }
 
   const renderTerminal = () => (
     <div className="mt-2 p-2 bg-black border border-cyan-900/50 h-24 overflow-hidden text-[9px] font-mono text-cyan-600">
@@ -386,8 +423,7 @@ function App() {
                 {simulating ? `COMPUTING [${scanProgress}%]` : '[ INITIALIZE_SIMULATION ]'}
               </button>
               
-              {renderWinner()}
-              {renderTelemetry()}
+              {renderMetricsTable()}
               {renderTerminal()}
             </div>
           </div>
