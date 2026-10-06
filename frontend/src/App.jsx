@@ -76,7 +76,8 @@ function App() {
     if (procs.length === 0) return;
     setSimulating(true);
     try {
-      const res = await fetch('http://localhost:8000/simulate', {
+      const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+      const res = await fetch(`${API_BASE}/simulate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ processes: procs, alpha, beta, q_min: qMin, q_max: qMax, rr_quantum: rrQuantum })
